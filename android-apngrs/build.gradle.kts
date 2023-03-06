@@ -53,7 +53,6 @@ publishing {
         register<MavenPublication>("release") {
             groupId = "me.tatarka.android"
             artifactId = "apngrs"
-            version = "0.1"
 
             afterEvaluate {
                 from(components["release"])

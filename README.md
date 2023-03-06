@@ -1,15 +1,17 @@
+[![CircleCI](https://circleci.com/gh/evant/android-apngrs.svg?style=svg&circle-token=8792fa19911be92d6a1d66dd45ece3bf6712f778)](https://circleci.com/gh/evant/android-apngrs)[![Maven
+Central](https://img.shields.io/maven-central/v/me.tatarka.android/android-apngrs.svg)](https://search.maven.org/search?q=g:me.tatarka.android)
+[![Sonatype Snapshot](https://img.shields.io/nexus/s/https/oss.sonatype.org/me.tatarka.android/android-apngrs.svg)](https://oss.sonatype.org/content/repositories/snapshots/me/tatarka/android/)
+
 # android-apngs
 
 Bindings to [image-rs](https://github.com/image-rs/image) for APNG support on Android.
 
 # Usage
 
-TODO: publish to maven central
-
 You can include the decoder with
 
 ```kotlin
-implementation("me.tatarka.android:anpngs:0.1")
+implementation("me.tatarka.android:anpngrs:0.1")
 ```
 
 Then you can create a source and decode a drawable. The api is mirrored after
@@ -26,7 +28,7 @@ drawable.start() // to start the animation.
 For easy [coil](https://coil-kt.github.io/coil/) integration, include
 
 ```kotlin
-implementation("me.tatarka.android:anpngs-coil:0.1")
+implementation("me.tatarka.android:anpngrs-coil:0.1")
 ```
 
 and then add the decoder
