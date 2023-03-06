@@ -12,8 +12,8 @@ jobs:
     steps:
       - checkout
       - run:
-          name: Install Python 🤷‍♀️
-          command: sudo apt update && sudo apt install -y python3
+          name: Alias Python 🤷‍♀️
+          command: sudo apt update && sudo apt install -y python-is-python3
       - rust/install:
           version: 1.67.1
       - run:
