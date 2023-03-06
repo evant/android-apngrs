@@ -17,7 +17,7 @@ jobs:
       - rust/install:
           version: 1.67.1
       - run:
-          name: Install Rust Toolchains
+          name: Install Rust Targets 🦀🎯
           command: |
             rustup target install aarch64-linux-android
             rustup target install armv7-linux-androideabi
@@ -29,10 +29,10 @@ jobs:
                 name: Ndk Path
                 command: echo "ndk.dir=${ANDROID_HOME}/ndk/25.2.9519653" > local.properties
             - run:
-                name: Build Native
+                name: Build Native 🦀
                 command: ./gradlew cargoBuild
             - run:
-                name: Build
+                name: Build 🐘
                 command: ./gradlew assemble
             - deploy:
                 command: |
