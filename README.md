@@ -2,7 +2,7 @@
 Central](https://img.shields.io/maven-central/v/me.tatarka.android/android-apngrs.svg)](https://search.maven.org/search?q=g:me.tatarka.android)
 [![Sonatype Snapshot](https://img.shields.io/nexus/s/https/oss.sonatype.org/me.tatarka.android/android-apngrs.svg)](https://oss.sonatype.org/content/repositories/snapshots/me/tatarka/android/)
 
-# android-apngs
+# android-apngrs
 
 Bindings to [image-rs](https://github.com/image-rs/image) for APNG support on Android.
 
