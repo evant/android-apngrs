@@ -13,6 +13,13 @@ jobs:
       - checkout
       - rust/install:
           version: 1.67.1
+      - run:
+          name: Install Rust Toolchains
+          command: |
+            rustup target install aarch64-linux-android
+            rustup target install armv7-linux-androideabi
+            rustup target install i686-linux-android
+            rustup target install x86_64-linux-android
       - gradle/with_cache:
           steps:
             - run:
