@@ -11,6 +11,9 @@ jobs:
       JVM_OPTS: -Xmx3200m
     steps:
       - checkout
+      - run:
+          name: Install Python 🤷‍♀️
+          command: sudo apt update && sudo apt install -y python3
       - rust/install:
           version: 1.67.1
       - run:
