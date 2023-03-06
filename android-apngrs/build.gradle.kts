@@ -3,6 +3,7 @@ plugins {
     id("org.jetbrains.kotlin.android")
     id("org.mozilla.rust-android-gradle.rust-android") version "0.9.3"
     id("maven-publish")
+    id("signing")
 }
 
 android {
@@ -29,6 +30,7 @@ android {
     publishing {
         singleVariant("release") {
             withSourcesJar()
+            withJavadocJar()
         }
     }
 }
@@ -56,6 +58,39 @@ publishing {
             afterEvaluate {
                 from(components["release"])
             }
+
+            pom {
+                name.set("android-apngrs")
+                description.set("Bindings to image-rs for APNG support on Android")
+                url.set("https://github.com/evant/android-apngrs")
+                licenses {
+                    license {
+                        name.set("The Apache License, Version 2.0")
+                        url.set("http://www.apache.org/licenses/LICENSE-2.0.txt")
+                    }
+                }
+                developers {
+                    developer {
+                        id.set("evant")
+                        name.set("Eva Tatarka")
+                    }
+                }
+                scm {
+                    connection.set("https://github.com/evant/android-apngrs.git")
+                    developerConnection.set("https://github.com/evant/android-apngrs.git")
+                    url.set("https://github.com/evant/android-apngrs")
+                }
+            }
         }
+    }
+}
+
+signing {
+    setRequired {
+        findProperty("signing.keyId") != null
+    }
+
+    publishing.publications.all {
+        sign(this)
     }
 }

@@ -39,12 +39,15 @@ val imageLoader = ImageLoader.Builder(context)
     .build()
 ```
 
-## Current Limitations
+## Current Limitations/Possible Future Directions
 
 - All animations are currently rendered as looping infinitely instead of respecting the num_plays
   value.
 - All pixel data for all frames is loaded into memory, no scaling is done on this buffer. This
   library was designed with a focus on small images so this is fine but may be worth optimizing in
   the future for better memory usage on large images.
+- Image data is loaded first into a byte array in memory before decoding, could do some sort of
+  streaming support here if I could figure out the jni bits for that.
 - image-rs actually supports a wide range of image formats but only APNGs are currently supported.
   May be expanded in the future if there's value.
+- Source inputs are limited to byte arrays and resources, this could be expanded pretty easily.
