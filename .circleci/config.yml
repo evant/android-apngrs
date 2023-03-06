@@ -1,4 +1,4 @@
-version: 2
+version: 2.1
 orbs:
   gradle: circleci/gradle@3.0.0
 jobs:
@@ -20,7 +20,7 @@ jobs:
             	rm rustup-init && \
             	rustc --version && \
             	cargo --version
-      - with_cache:
+      - gradle/with_cache:
           steps:
             - run:
                 name: Ndk Path
