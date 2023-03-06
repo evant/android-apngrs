@@ -12,8 +12,9 @@ dependencyResolutionManagement {
         mavenCentral()
     }
 }
-rootProject.name = "android-png-rs"
-include(":app")
+rootProject.name = "android-apngrs"
 include(":android-apngrs")
-include(":benchmark")
 include(":android-apngrs-coil")
+
+include(":app")
+include(":benchmark")
