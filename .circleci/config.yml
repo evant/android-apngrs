@@ -1,6 +1,7 @@
-version: 2
+version: 2.1
 orbs:
   gradle: circleci/gradle@3.0.0
+  rust: circleci/rust@1.6.0
 jobs:
   build:
     working_directory: ~/code
@@ -11,25 +12,27 @@ jobs:
     steps:
       - checkout
       - run:
-          name: Install Rust
+          name: Alias Python 🤷‍♀️
+          command: sudo apt update && sudo apt install -y python-is-python3
+      - rust/install:
+          version: 1.67.1
+      - run:
+          name: Install Rust Targets 🦀🎯
           command: |
-            export RUST_VERSION=1.67.1
-            curl -O https://static.rust-lang.org/rustup/dist/x86_64-unknown-linux-gnu/rustup-init && \
-            	chmod +x rustup-init && \
-            	./rustup-init -y --no-modify-path --default-toolchain $RUST_VERSION && \
-            	rm rustup-init && \
-            	rustc --version && \
-            	cargo --version
-      - with_cache:
+            rustup target install aarch64-linux-android
+            rustup target install armv7-linux-androideabi
+            rustup target install i686-linux-android
+            rustup target install x86_64-linux-android
+      - gradle/with_cache:
           steps:
             - run:
                 name: Ndk Path
                 command: echo "ndk.dir=${ANDROID_HOME}/ndk/25.2.9519653" > local.properties
             - run:
-                name: Build Native
+                name: Build Native 🦀
                 command: ./gradlew cargoBuild
             - run:
-                name: Build
+                name: Build 🐘
                 command: ./gradlew assemble
             - deploy:
                 command: |
