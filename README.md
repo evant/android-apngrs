@@ -11,7 +11,7 @@ Bindings to [image-rs](https://github.com/image-rs/image) for APNG support on An
 You can include the decoder with
 
 ```kotlin
-implementation("me.tatarka.android:anpngrs:0.1")
+implementation("me.tatarka.android:apngrs:0.2")
 ```
 
 Then you can create a source and decode a drawable. The api is mirrored after
@@ -28,7 +28,7 @@ drawable.start() // to start the animation.
 For easy [coil](https://coil-kt.github.io/coil/) integration, include
 
 ```kotlin
-implementation("me.tatarka.android:anpngrs-coil:0.1")
+implementation("me.tatarka.android:apngrs-coil:0.2")
 ```
 
 and then add the decoder

@@ -1,7 +1,7 @@
 plugins {
     id("com.android.library")
     id("org.jetbrains.kotlin.android")
-    id("org.mozilla.rust-android-gradle.rust-android") version "0.9.3"
+    id("io.github.MatrixDev.android-rust") version "0.3.2"
     id("maven-publish")
     id("signing")
 }
@@ -41,11 +41,12 @@ dependencies {
     androidTestImplementation("androidx.test:runner:1.5.2")
 }
 
-cargo {
-    module  = "src/main/rust"
-    libname = "android_apngrs"
-    targets = listOf("arm", "arm64", "x86", "x86_64")
-    profile = "debug"
+androidRust {
+    module("android_apngrs") {
+        path = file("src/main/rust")
+        profile = "release"
+        targets = listOf("arm", "arm64", "x86", "x86_64")
+    }
 }
 
 publishing {
@@ -53,6 +54,7 @@ publishing {
         register<MavenPublication>("release") {
             groupId = "me.tatarka.android"
             artifactId = "apngrs"
+            version = rootProject.version.toString()
 
             afterEvaluate {
                 from(components["release"])
