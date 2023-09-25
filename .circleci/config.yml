@@ -29,9 +29,6 @@ jobs:
                 name: Ndk Path
                 command: echo "ndk.dir=${ANDROID_HOME}/ndk/25.2.9519653" > local.properties
             - run:
-                name: Build Native 🦀
-                command: ./gradlew cargoBuild
-            - run:
                 name: Build 🐘
                 command: ./gradlew assemble
             - deploy:
