@@ -19,7 +19,7 @@ jobs:
       - android/install-ndk:
           version: 25.2.9519653
       - rust/install:
-          version: 1.67.1
+          version: 1.72.0
       - run:
           name: Install Rust Targets 🦀🎯
           command: |
