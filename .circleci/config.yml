@@ -2,11 +2,13 @@ version: 2.1
 orbs:
   gradle: circleci/gradle@3.0.0
   rust: circleci/rust@1.6.0
+  android: circleci/android@2.3.0
 jobs:
   build:
     working_directory: ~/code
     docker:
-      - image: cimg/android:2023.02.1-ndk
+      - image: cimg/android:2023.04.1
+    resource_class: large
     environment:
       JVM_OPTS: -Xmx3200m
     steps:
@@ -14,23 +16,20 @@ jobs:
       - run:
           name: Alias Python 🤷‍♀️
           command: sudo apt update && sudo apt install -y python-is-python3
+      - android/install-ndk:
+          version: 25.2.9519653
       - rust/install:
-          version: 1.67.1
+          version: 1.72.0
       - run:
           name: Install Rust Targets 🦀🎯
           command: |
+            rustup set profile minimal
             rustup target install aarch64-linux-android
             rustup target install armv7-linux-androideabi
             rustup target install i686-linux-android
             rustup target install x86_64-linux-android
       - gradle/with_cache:
           steps:
-            - run:
-                name: Ndk Path
-                command: echo "ndk.dir=${ANDROID_HOME}/ndk/25.2.9519653" > local.properties
-            - run:
-                name: Build Native 🦀
-                command: ./gradlew cargoBuild
             - run:
                 name: Build 🐘
                 command: ./gradlew assemble
