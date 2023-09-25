@@ -22,6 +22,7 @@ jobs:
       - run:
           name: Install Rust Targets 🦀🎯
           command: |
+            rustup set profile minimal
             rustup target install aarch64-linux-android
             rustup target install armv7-linux-androideabi
             rustup target install i686-linux-android
