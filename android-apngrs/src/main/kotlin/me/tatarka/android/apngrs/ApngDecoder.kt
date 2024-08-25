@@ -5,6 +5,7 @@ import android.graphics.Bitmap
 import me.tatarka.android.apngrs.ApngDecoder.Companion.decodeDrawable
 import me.tatarka.android.apngrs.ApngDecoder.Source
 import java.io.ByteArrayOutputStream
+import java.io.IOException
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
@@ -67,6 +68,7 @@ class ApngDecoder private constructor(
         }
 
         @JvmStatic
+        @Throws(IOException::class)
         fun decodeDrawable(source: Source): ApngDrawable {
             val decoder = source.createPngDecoder()
             val bitmap =
