@@ -11,7 +11,8 @@ import android.graphics.drawable.Animatable2
 import android.graphics.drawable.Drawable
 import android.os.Handler
 import android.os.Looper
-import me.tatarka.android.apngrs.ApngDecoder
+import android.util.Log
+import java.io.IOException
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.TimeUnit
 
@@ -25,7 +26,7 @@ class ApngDrawable internal constructor(
     private val initialDelay: Int,
 ) : Drawable(), Animatable2 {
 
-    private var paint : Paint = Paint()
+    private var paint: Paint = Paint()
     private val drawFilter: DrawFilter =
         PaintFlagsDrawFilter(0, Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
     private val animationCallbacks = CopyOnWriteArrayList<Animatable2.AnimationCallback>()
@@ -36,10 +37,15 @@ class ApngDrawable internal constructor(
         override fun run() {
             val currentTime = System.nanoTime()
             if (animationRunning) {
-                val delay = decoder.readNextFrame(bitmap)
-                invalidateSelf()
-                val elapsed = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - currentTime)
-                animationHandler.postDelayed(this, delay - elapsed)
+                try {
+                    val delay = decoder.readNextFrame(bitmap)
+                    invalidateSelf()
+                    val elapsed = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - currentTime)
+                    animationHandler.postDelayed(this, delay - elapsed)
+                } catch (e: IOException) {
+                    Log.d("apngrs", "failed to decode frame", e)
+                    stop()
+                }
             }
         }
     }
