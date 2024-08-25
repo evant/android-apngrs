@@ -137,7 +137,7 @@ impl NativeApngDecoder {
         let cursor = Cursor::new(data);
         let decoder = image::codecs::png::PngDecoder::new(cursor)?;
         let (width, height) = decoder.dimensions();
-        let frames = decoder.apng().into_frames();
+        let frames = decoder.apng()?.into_frames();
         Ok({
             NativeApngDecoder {
                 width,
