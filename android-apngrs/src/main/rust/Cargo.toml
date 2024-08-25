@@ -9,7 +9,7 @@ crate_type = ["cdylib"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-image = { version = "0.24.5", default-features = false, features = ["png"] }
+image = { version = "0.25.2", default-features = false, features = ["png"] }
 jni = "0.21.0"
 ndk = { version = "0.7.0", features = ["bitmap"] }
 
