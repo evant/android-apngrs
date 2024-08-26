@@ -8,6 +8,10 @@ import java.io.ByteArrayOutputStream
 import java.io.IOException
 import java.util.concurrent.atomic.AtomicBoolean
 
+internal const val FRAME_STAY = 0
+internal const val FRAME_ADVANCE = 1
+internal const val FRAME_RESET = 2
+
 /**
  * A class for converting animated PNGs (APNG) into [android.graphics.drawable.Drawable] objects.
  *
@@ -73,23 +77,27 @@ class ApngDecoder private constructor(
             val decoder = source.createPngDecoder()
             val bitmap =
                 Bitmap.createBitmap(decoder.width, decoder.height, Bitmap.Config.ARGB_8888)
-            val initialDelay = nNextFrame(decoder.nativePtr, bitmap, bitmap.byteCount)
-            return ApngDrawable(decoder, bitmap, initialDelay)
+            return ApngDrawable(decoder, bitmap)
         }
 
         @JvmStatic
         private external fun nCreate(data: ByteArray): ApngDecoder
 
         @JvmStatic
-        private external fun nNextFrame(nativePtr: Long, bitmap: Bitmap, bitmapSize: Int): Int
+        private external fun nDraw(
+            nativePtr: Long,
+            bitmap: Bitmap,
+            bitmapSize: Int,
+            frameOption: Int,
+        ): Int
 
         @JvmStatic
         private external fun nClose(nativePtr: Long)
     }
 
-    internal fun readNextFrame(bitmap: Bitmap): Int {
+    internal fun draw(bitmap: Bitmap, frameOption: Int): Int {
         //TODO: figure out if we should loop or not
-        return nNextFrame(nativePtr, bitmap, bitmap.byteCount)
+        return nDraw(nativePtr, bitmap, bitmap.byteCount, frameOption)
     }
 
     private class ByteArraySource(private val data: ByteArray) : Source() {
