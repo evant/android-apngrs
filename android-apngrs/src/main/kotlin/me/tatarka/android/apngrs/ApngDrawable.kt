@@ -11,10 +11,10 @@ import android.graphics.drawable.Animatable2
 import android.graphics.drawable.Drawable
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import android.util.Log
 import java.io.IOException
 import java.util.concurrent.CopyOnWriteArrayList
-import java.util.concurrent.TimeUnit
 
 
 /**
@@ -23,40 +23,65 @@ import java.util.concurrent.TimeUnit
 class ApngDrawable internal constructor(
     private val decoder: ApngDecoder,
     private val bitmap: Bitmap,
-    private val initialDelay: Int,
 ) : Drawable(), Animatable2 {
 
     private var paint: Paint = Paint()
     private val drawFilter: DrawFilter =
         PaintFlagsDrawFilter(0, Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
-    private val animationCallbacks = CopyOnWriteArrayList<Animatable2.AnimationCallback>()
-
-    private val animationHandler = Handler(Looper.getMainLooper())
+    private var animationCallbacks: CopyOnWriteArrayList<Animatable2.AnimationCallback>? = null
+    private val animationRunnable = Runnable { invalidateSelf() }
+    private var starting = false
     private var animationRunning = false
-    private val animationRunnable = object : Runnable {
-        override fun run() {
-            val currentTime = System.nanoTime()
-            if (animationRunning) {
-                try {
-                    val delay = decoder.readNextFrame(bitmap)
-                    invalidateSelf()
-                    val elapsed = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - currentTime)
-                    animationHandler.postDelayed(this, delay - elapsed)
-                } catch (e: IOException) {
-                    Log.d("apngrs", "failed to decode frame", e)
-                    stop()
-                }
-            }
-        }
-    }
+    private val callbackHandler = Handler(Looper.getMainLooper())
 
     init {
         paint.isAntiAlias = true
     }
 
     override fun draw(canvas: Canvas) {
-        canvas.drawFilter = drawFilter
-        canvas.drawBitmap(bitmap, null, bounds, paint)
+        val frameOption: Int
+        if (starting) {
+            frameOption = FRAME_RESET
+            starting = false
+            postOnAnimationStart()
+        } else if (isRunning) {
+            frameOption = FRAME_ADVANCE
+        } else {
+            frameOption = FRAME_STAY
+        }
+        try {
+            val delay = decoder.draw(bitmap, frameOption = frameOption)
+            canvas.drawFilter = drawFilter
+            canvas.drawBitmap(bitmap, null, bounds, paint)
+            if (delay == -1) {
+                stop()
+            } else {
+                scheduleSelf(animationRunnable, delay + SystemClock.uptimeMillis())
+            }
+        } catch (e: IOException) {
+            Log.d("apngrs", "failed to decode frame", e)
+            stop()
+        }
+    }
+
+    private fun postOnAnimationStart() {
+        animationCallbacks?.let {
+            callbackHandler.post {
+                for (callback in it) {
+                    callback.onAnimationStart(this)
+                }
+            }
+        }
+    }
+
+    private fun postOnAnimationEnd() {
+        animationCallbacks?.let {
+            callbackHandler.post {
+                for (callback in it) {
+                    callback.onAnimationEnd(this)
+                }
+            }
+        }
     }
 
     override fun setAlpha(alpha: Int) {
@@ -85,19 +110,17 @@ class ApngDrawable internal constructor(
     }
 
     override fun start() {
-        for (callback in animationCallbacks) {
-            callback.onAnimationStart(this)
+        if (!animationRunning) {
+            starting = true
+            animationRunning = true
+            invalidateSelf()
         }
-        animationRunning = true
-        animationHandler.postDelayed(animationRunnable, initialDelay.toLong())
     }
 
     override fun stop() {
-        for (callback in animationCallbacks) {
-            callback.onAnimationEnd(this)
-        }
         animationRunning = false
-        animationHandler.removeCallbacks(animationRunnable)
+        unscheduleSelf(animationRunnable)
+        postOnAnimationEnd()
     }
 
     override fun isRunning(): Boolean {
@@ -105,14 +128,25 @@ class ApngDrawable internal constructor(
     }
 
     override fun registerAnimationCallback(callback: Animatable2.AnimationCallback) {
-        animationCallbacks.add(callback)
+        val callbacks = animationCallbacks
+            ?: CopyOnWriteArrayList<Animatable2.AnimationCallback>().also {
+                animationCallbacks = it
+            }
+        if (callback !in callbacks) {
+            callbacks.add(callback)
+        }
     }
 
     override fun unregisterAnimationCallback(callback: Animatable2.AnimationCallback): Boolean {
-        return animationCallbacks.remove(callback)
+        val callbacks = animationCallbacks ?: return false
+        if (!callbacks.remove(callback)) return false
+        if (callbacks.isEmpty()) {
+            animationCallbacks = null
+        }
+        return true
     }
 
     override fun clearAnimationCallbacks() {
-        animationCallbacks.clear()
+        animationCallbacks = null
     }
 }

@@ -1,3 +1,5 @@
 <resources>
     <string name="app_name">android-png-rs</string>
+    <string name="start">Start</string>
+    <string name="stop">Stop</string>
 </resources>

@@ -4,11 +4,32 @@ use image::error::DecodingError;
 use image::{AnimationDecoder, Frame, Frames, ImageDecoder, ImageError, Rgba};
 use image::{EncodableLayout, Pixel};
 use jni::objects::{JByteArray, JClass, JObject};
-use jni::sys::{jboolean, jint, jlong};
+use jni::sys::{jboolean, jint, jlong, JNI_TRUE};
 use jni::JNIEnv;
 use ndk::bitmap::AndroidBitmap;
 
 struct JNone;
+
+#[repr(i32)]
+#[derive(PartialEq, Eq)]
+enum FrameOption {
+    Stay,
+    Advance,
+    Reset,
+}
+
+impl TryFrom<i32> for FrameOption {
+    type Error = ();
+
+    fn try_from(value: i32) -> Result<Self, Self::Error> {
+        match value {
+            0 => Ok(FrameOption::Stay),
+            1 => Ok(FrameOption::Advance),
+            2 => Ok(FrameOption::Reset),
+            _ => Err(()),
+        }
+    }
+}
 
 macro_rules! unwrap_or_throw {
     ($env:ident, $result:expr) => {
@@ -103,12 +124,13 @@ pub extern "system" fn Java_me_tatarka_android_apngrs_ApngDecoder_nClose<'local>
 }
 
 #[no_mangle]
-pub unsafe extern "system" fn Java_me_tatarka_android_apngrs_ApngDecoder_nNextFrame<'local>(
+pub unsafe extern "system" fn Java_me_tatarka_android_apngrs_ApngDecoder_nDraw<'local>(
     mut env: JNIEnv<'local>,
     _class: JClass<'local>,
     decoder_ptr: jlong,
     bitmap: JObject<'local>,
     bitmap_size: jint,
+    frame_option: jint,
 ) -> jint {
     let decoder: &mut NativeApngDecoder = unwrap_or_throw!(
         env,
@@ -119,7 +141,10 @@ pub unsafe extern "system" fn Java_me_tatarka_android_apngrs_ApngDecoder_nNextFr
     let bitmap = AndroidBitmap::from_jni(env.get_raw(), *bitmap);
     let bitmap_pixels = unwrap_or_throw!(env, bitmap.lock_pixels()) as *mut u8;
     let bitmap_slice = std::slice::from_raw_parts_mut(bitmap_pixels, bitmap_size as usize);
-    let result = decoder.next_frame(bitmap_slice);
+    let result = decoder.draw(
+        bitmap_slice,
+        frame_option.try_into().expect("invalid frame option"),
+    );
     unwrap_or_throw!(env, bitmap.unlock_pixels());
     unwrap_or_throw!(env, result, "java/io/IOException") as jint
 }
@@ -128,6 +153,7 @@ struct NativeApngDecoder {
     width: u32,
     height: u32,
     current_frame: usize,
+    decoding_complete: bool,
     frames: Frames<'static>,
     decoded_frames: Vec<Frame>,
 }
@@ -138,50 +164,83 @@ impl NativeApngDecoder {
         let decoder = image::codecs::png::PngDecoder::new(cursor)?;
         let (width, height) = decoder.dimensions();
         let frames = decoder.apng()?.into_frames();
-        Ok({
-            NativeApngDecoder {
-                width,
-                height,
-                current_frame: 0,
-                frames,
-                decoded_frames: vec![],
-            }
-        })
+
+        let mut decoder = NativeApngDecoder {
+            width,
+            height,
+            current_frame: 0,
+            decoding_complete: false,
+            frames,
+            decoded_frames: vec![],
+        };
+        // always decode the first frame so we have something to show immedatly
+        decoder.decode_next_frame();
+        Ok(decoder)
     }
 
-    fn next_frame(&mut self, out: &mut [u8]) -> Result<u32, ImageError> {
-        let frame = if let Some(next_frame) = self.frames.next() {
-            let mut next_frame = next_frame?;
+    fn decode_next_frame(&mut self) -> Option<Result<&Frame, ImageError>> {
+        if let Some(next_frame) = self.frames.next() {
+            let mut next_frame = match next_frame {
+                Ok(f) => f,
+                Err(e) => return Some(Err(e)),
+            };
             // we need to premultiply for android to render correctly.
             for pixel in next_frame.buffer_mut().pixels_mut() {
                 premultiply_alpha(pixel);
             }
             self.decoded_frames.push(next_frame);
-            self.current_frame += 1;
-            self.decoded_frames.last().unwrap()
+            self.decoded_frames.last().map(|frame| Ok(frame))
         } else {
-            if self.decoded_frames.is_empty() {
-                return Err(ImageError::Decoding(DecodingError::new(
-                    image::error::ImageFormatHint::Exact(image::ImageFormat::Png),
-                    "missing frames, are you sure this is an APNG?",
-                )));
-            }
-            self.current_frame = (self.current_frame + 1) % self.decoded_frames.len();
+            self.decoding_complete = true;
+            None
+        }
+    }
+
+    fn draw(&mut self, out: &mut [u8], frame_option: FrameOption) -> Result<u32, ImageError> {
+        if frame_option == FrameOption::Reset {
+            self.current_frame = 0;
+        }
+
+        let frame = if self.current_frame < self.decoded_frames.len() {
             self.decoded_frames.get(self.current_frame).unwrap()
+        } else {
+            if let Some(next_frame) = self.decode_next_frame() {
+                next_frame?
+            } else {
+                if self.decoded_frames.is_empty() {
+                    return Err(ImageError::Decoding(DecodingError::new(
+                        image::error::ImageFormatHint::Exact(image::ImageFormat::Png),
+                        "missing frames, are you sure this is an APNG?",
+                    )));
+                }
+                self.current_frame = 0;
+                self.decoded_frames.get(self.current_frame).unwrap()
+            }
         };
+
+        out.copy_from_slice(frame.buffer().as_bytes());
+        let (num, denom) = frame.delay().numer_denom_ms();
+
         let bytes = frame.buffer().as_bytes();
         if out.len() < bytes.len() {
             return Err(ImageError::IoError(std::io::Error::new(
-                std::io::ErrorKind::Other,
-                format!(
-                    "provided output buffer is not large enough, expected: {} bytes but got {} bytes",
-                    bytes.len(),
-                    out.len()
-                ),
-            )));
+                    std::io::ErrorKind::Other,
+                    format!(
+                        "provided output buffer is not large enough, expected: {} bytes but got {} bytes",
+                        bytes.len(),
+                        out.len()
+                    ),
+                )));
         }
-        out.copy_from_slice(frame.buffer().as_bytes());
-        let (num, denom) = frame.delay().numer_denom_ms();
+
+        if frame_option == FrameOption::Advance {
+            if self.decoding_complete {
+                self.current_frame = (self.current_frame + 1) % self.decoded_frames.len();
+            } else {
+                self.current_frame += 1;
+            }
+        }
+
         Ok(num / denom)
     }
 }

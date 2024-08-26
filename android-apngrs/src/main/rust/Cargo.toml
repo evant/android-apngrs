@@ -11,6 +11,7 @@ crate_type = ["cdylib"]
 [dependencies]
 image = { version = "0.25.2", default-features = false, features = ["png"] }
 jni = "0.21.0"
+[target.'cfg(target_os = "android")'.dependencies]
 ndk = { version = "0.7.0", features = ["bitmap"] }
 
 [profile.release]

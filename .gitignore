@@ -8,3 +8,4 @@
 .externalNativeBuild
 .cxx
 local.properties
+/android-apngrs/src/main/rust/target
