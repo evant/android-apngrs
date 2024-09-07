@@ -5,7 +5,7 @@ plugins {
 
 android {
     namespace 'me.tatarka.android.pngrs'
-    compileSdk 33
+    compileSdk 34
 
     defaultConfig {
         applicationId "me.tatarka.android.pngrs"
@@ -34,6 +34,8 @@ android {
 
 dependencies {
     implementation project(':android-apngrs')
+    implementation project(':android-apngrs-coil')
+    implementation "io.coil-kt:coil:2.6.0"
 //    implementation("me.tatarka.android:apngrs:0.2")
     implementation 'androidx.core:core-ktx:1.9.0'
     implementation 'androidx.appcompat:appcompat:1.6.1'
