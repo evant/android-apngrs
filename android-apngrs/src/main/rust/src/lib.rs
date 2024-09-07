@@ -1,7 +1,12 @@
+use std::error::Error;
 use std::io::Cursor;
 
+use fast_image_resize::{ResizeError, ResizeOptions};
 use image::error::DecodingError;
-use image::{AnimationDecoder, Frame, Frames, ImageDecoder, ImageError, Rgba};
+use image::{
+    imageops, AnimationDecoder, DynamicImage, Frame, Frames, ImageDecoder, ImageError, Rgba,
+    RgbaImage,
+};
 use image::{EncodableLayout, Pixel};
 use jni::objects::{JByteArray, JClass, JObject};
 use jni::sys::{jboolean, jint, jlong, JNI_TRUE};
@@ -47,6 +52,12 @@ macro_rules! unwrap_or_throw {
     };
 }
 
+impl From<JNone> for () {
+    fn from(_value: JNone) -> Self {
+        ()
+    }
+}
+
 impl From<JNone> for JObject<'_> {
     fn from(_value: JNone) -> Self {
         return JObject::null();
@@ -77,7 +88,7 @@ pub extern "system" fn Java_me_tatarka_android_apngrs_ApngDecoder_nCreate<'local
         NativeApngDecoder::decode(data),
         "java/io/IOException"
     ));
-    let (width, height) = (decoder.width, decoder.height);
+    let size = decoder.size;
     let native_ptr = Box::into_raw(decoder);
     let png_decoder_class =
         unwrap_or_throw!(env, env.find_class("me/tatarka/android/apngrs/ApngDecoder"));
@@ -88,11 +99,57 @@ pub extern "system" fn Java_me_tatarka_android_apngrs_ApngDecoder_nCreate<'local
             "(JII)V",
             &[
                 (native_ptr as jlong).into(),
-                (width as jint).into(),
-                (height as jint).into(),
+                (size.width as jint).into(),
+                (size.height as jint).into(),
             ]
         )
     )
+}
+
+#[no_mangle]
+pub extern "system" fn Java_me_tatarka_android_apngrs_ApngDecoder_nDecodeFirstFrame<'local>(
+    mut env: JNIEnv<'local>,
+    _class: JClass<'local>,
+    ptr: jlong,
+) {
+    let decoder: &mut NativeApngDecoder = unsafe {
+        unwrap_or_throw!(
+            env,
+            (ptr as *mut NativeApngDecoder)
+                .as_mut()
+                .ok_or("invalid pointer")
+        )
+    };
+
+    if let Some(result) = decoder.decode_next_frame() {
+        unwrap_or_throw!(env, result, "java/io/IOException");
+    }
+}
+
+#[no_mangle]
+pub extern "system" fn Java_me_tatarka_android_apngrs_ApngDecoder_nConfigure<'local>(
+    mut env: JNIEnv<'local>,
+    _class: JClass<'local>,
+    ptr: jlong,
+    target_width: jint,
+    target_height: jint,
+) {
+    let decoder: &mut NativeApngDecoder = unsafe {
+        unwrap_or_throw!(
+            env,
+            (ptr as *mut NativeApngDecoder)
+                .as_mut()
+                .ok_or("invalid pointer")
+        )
+    };
+    if target_width > -1 && target_height > -1 {
+        decoder.configure(Some(Size {
+            width: target_width as u32,
+            height: target_height as u32,
+        }));
+    } else {
+        decoder.configure(None);
+    }
 }
 
 fn copy_jbyteArray_to_vec<'local>(
@@ -149,9 +206,15 @@ pub unsafe extern "system" fn Java_me_tatarka_android_apngrs_ApngDecoder_nDraw<'
     unwrap_or_throw!(env, result, "java/io/IOException") as jint
 }
 
-struct NativeApngDecoder {
+#[derive(Copy, Clone, PartialEq, Eq)]
+struct Size {
     width: u32,
     height: u32,
+}
+
+struct NativeApngDecoder {
+    size: Size,
+    target_size: Option<Size>,
     current_frame: usize,
     decoding_complete: bool,
     frames: Frames<'static>,
@@ -166,24 +229,45 @@ impl NativeApngDecoder {
         let frames = decoder.apng()?.into_frames();
 
         let mut decoder = NativeApngDecoder {
-            width,
-            height,
+            size: Size { width, height },
+            target_size: None,
             current_frame: 0,
             decoding_complete: false,
             frames,
             decoded_frames: vec![],
         };
-        // always decode the first frame so we have something to show immedatly
-        decoder.decode_next_frame();
         Ok(decoder)
     }
 
-    fn decode_next_frame(&mut self) -> Option<Result<&Frame, ImageError>> {
+    fn configure(&mut self, target_size: Option<Size>) {
+        self.target_size = target_size;
+    }
+
+    fn decode_next_frame(&mut self) -> Option<Result<&Frame, DecodeImageError>> {
         if let Some(next_frame) = self.frames.next() {
             let mut next_frame = match next_frame {
                 Ok(f) => f,
-                Err(e) => return Some(Err(e)),
+                Err(e) => return Some(Err(e.into())),
             };
+            if let Some(target_size) = self.target_size {
+                if target_size != self.size {
+                    let (top, left, delay) =
+                        (next_frame.top(), next_frame.left(), next_frame.delay());
+                    let mut out_buffer = DynamicImage::new(
+                        target_size.width,
+                        target_size.height,
+                        image::ColorType::Rgba8,
+                    );
+                    if let Err(e) = fast_image_resize::Resizer::new().resize(
+                        &DynamicImage::ImageRgba8(next_frame.into_buffer()),
+                        &mut out_buffer,
+                        &ResizeOptions::new(),
+                    ) {
+                        return Some(Err(e.into()));
+                    }
+                    next_frame = Frame::from_parts(out_buffer.into_rgba8(), left, top, delay)
+                }
+            }
             // we need to premultiply for android to render correctly.
             for pixel in next_frame.buffer_mut().pixels_mut() {
                 premultiply_alpha(pixel);
@@ -196,7 +280,7 @@ impl NativeApngDecoder {
         }
     }
 
-    fn draw(&mut self, out: &mut [u8], frame_option: FrameOption) -> Result<u32, ImageError> {
+    fn draw(&mut self, out: &mut [u8], frame_option: FrameOption) -> Result<u32, DecodeImageError> {
         if frame_option == FrameOption::Reset {
             self.current_frame = 0;
         }
@@ -211,7 +295,8 @@ impl NativeApngDecoder {
                     return Err(ImageError::Decoding(DecodingError::new(
                         image::error::ImageFormatHint::Exact(image::ImageFormat::Png),
                         "missing frames, are you sure this is an APNG?",
-                    )));
+                    ))
+                    .into());
                 }
                 self.current_frame = 0;
                 self.decoded_frames.get(self.current_frame).unwrap()
@@ -230,7 +315,7 @@ impl NativeApngDecoder {
                         bytes.len(),
                         out.len()
                     ),
-                )));
+                )).into());
         }
 
         if frame_option == FrameOption::Advance {
@@ -242,6 +327,24 @@ impl NativeApngDecoder {
         }
 
         Ok(num / denom)
+    }
+}
+
+#[derive(Debug)]
+enum DecodeImageError {
+    ImageError(ImageError),
+    ResizeError(ResizeError),
+}
+
+impl From<ImageError> for DecodeImageError {
+    fn from(e: ImageError) -> Self {
+        DecodeImageError::ImageError(e)
+    }
+}
+
+impl From<ResizeError> for DecodeImageError {
+    fn from(e: ResizeError) -> Self {
+        DecodeImageError::ResizeError(e)
     }
 }
 

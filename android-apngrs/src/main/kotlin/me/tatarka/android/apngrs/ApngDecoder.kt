@@ -2,6 +2,7 @@ package me.tatarka.android.apngrs
 
 import android.content.res.Resources
 import android.graphics.Bitmap
+import android.util.Size
 import me.tatarka.android.apngrs.ApngDecoder.Companion.decodeDrawable
 import me.tatarka.android.apngrs.ApngDecoder.Source
 import java.io.ByteArrayOutputStream
@@ -33,6 +34,8 @@ class ApngDecoder private constructor(
 ) {
 
     private val closed = AtomicBoolean()
+
+    private var targetSize: Size? = null
 
     abstract class Source internal constructor() {
         internal open val resources: Resources? = null
@@ -75,13 +78,42 @@ class ApngDecoder private constructor(
         @Throws(IOException::class)
         fun decodeDrawable(source: Source): ApngDrawable {
             val decoder = source.createPngDecoder()
+            decoder.decodeFirstFrame()
             val bitmap =
                 Bitmap.createBitmap(decoder.width, decoder.height, Bitmap.Config.ARGB_8888)
             return ApngDrawable(decoder, bitmap)
         }
 
         @JvmStatic
+        @Throws(IOException::class)
+        fun decodeDrawable(source: Source, listener: OnHeaderDecodedListener): ApngDrawable {
+            val decoder = source.createPngDecoder()
+            val imageInfo = ImageInfo(size = Size(decoder.width, decoder.height))
+            listener.onHeaderDecoded(decoder, imageInfo, source)
+            val width: Int
+            val height: Int
+            val targetSize = decoder.targetSize
+            if (targetSize != null) {
+                width = targetSize.width
+                height = targetSize.height
+            } else {
+                width = decoder.width
+                height = decoder.height
+            }
+            decoder.configure(width, height)
+            decoder.decodeFirstFrame()
+            val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+            return ApngDrawable(decoder, bitmap)
+        }
+
+        @JvmStatic
         private external fun nCreate(data: ByteArray): ApngDecoder
+
+        @JvmStatic
+        private external fun nConfigure(nativePtr: Long, targetWidth: Int, targetHeight: Int)
+
+        @JvmStatic
+        private external fun nDecodeFirstFrame(nativePtr: Long)
 
         @JvmStatic
         private external fun nDraw(
@@ -93,6 +125,18 @@ class ApngDecoder private constructor(
 
         @JvmStatic
         private external fun nClose(nativePtr: Long)
+    }
+
+    fun setTargetSize(width: Int, height: Int) {
+        this.targetSize = Size(width, height)
+    }
+
+    internal fun decodeFirstFrame() {
+        nDecodeFirstFrame(nativePtr)
+    }
+
+    internal fun configure(targetWidth: Int, targetHeight: Int) {
+        nConfigure(nativePtr, targetWidth, targetHeight)
     }
 
     internal fun draw(bitmap: Bitmap, frameOption: Int): Int {
@@ -122,5 +166,11 @@ class ApngDecoder private constructor(
         }
         nClose(nativePtr)
         nativePtr = 0
+    }
+
+    class ImageInfo internal constructor(val size: Size)
+
+    fun interface OnHeaderDecodedListener {
+        fun onHeaderDecoded(decoder: ApngDecoder, info: ImageInfo, source: Source)
     }
 }
