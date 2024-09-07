@@ -6,6 +6,8 @@ import coil.decode.Decoder
 import coil.decode.ImageSource
 import coil.fetch.SourceResult
 import coil.request.Options
+import coil.size.Dimension
+import coil.size.Size
 import me.tatarka.android.apngrs.ApngDecoder
 import okio.BufferedSource
 import okio.ByteString
@@ -19,7 +21,36 @@ class ApngDecoderDecoder(private val source: ImageSource, private val options: O
 
     override suspend fun decode(): DecodeResult {
         val source = source.use { ApngDecoder.createSource(it.source().readByteArray()) }
-        val drawable = ApngDecoder.decodeDrawable(source)
+        val drawable = ApngDecoder.decodeDrawable(source) { decoder, info, _ ->
+            if (options.size != Size.ORIGINAL) {
+                val (width, height) = options.size
+                if (width is Dimension.Pixels && height is Dimension.Pixels) {
+                    if (!options.allowInexactSize ||
+                        (width.px < info.size.width || height.px < info.size.height)
+                    ) {
+                        decoder.setTargetSize(width = width.px, height = height.px)
+                    }
+                } else if (width is Dimension.Pixels) {
+                    // keep aspect ratio
+                    if (!options.allowInexactSize || width.px < info.size.width) {
+                        decoder.setTargetSize(
+                            width = width.px,
+                            height = (width.px * info.size.height / info.size.width)
+                        )
+                    }
+                } else if (height is Dimension.Pixels) {
+                    // keep aspect ratio
+                    if (!options.allowInexactSize || height.px < info.size.height) {
+                        decoder.setTargetSize(
+                            width = (height.px * info.size.width / info.size.height),
+                            height = height.px
+                        )
+                    }
+                } else {
+                    // keep source dimensions
+                }
+            }
+        }
         return DecodeResult(
             drawable = drawable,
             isSampled = false
