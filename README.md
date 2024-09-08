@@ -11,7 +11,7 @@ Bindings to [image-rs](https://github.com/image-rs/image) for APNG support on An
 You can include the decoder with
 
 ```kotlin
-implementation("me.tatarka.android:apngrs:0.3")
+implementation("me.tatarka.android:apngrs:0.4")
 ```
 
 Then you can create a source and decode a drawable. The api is mirrored after
@@ -28,7 +28,7 @@ drawable.start() // to start the animation.
 For easy [coil](https://coil-kt.github.io/coil/) integration, include
 
 ```kotlin
-implementation("me.tatarka.android:apngrs-coil:0.3")
+implementation("me.tatarka.android:apngrs-coil:0.4")
 ```
 
 and then add the decoder
@@ -45,9 +45,6 @@ val imageLoader = ImageLoader.Builder(context)
 
 - All animations are currently rendered as looping infinitely instead of respecting the num_plays
   value.
-- All pixel data for all frames is loaded into memory, no scaling is done on this buffer. This
-  library was designed with a focus on small images so this is fine but may be worth optimizing in
-  the future for better memory usage on large images.
 - Image data is loaded first into a byte array in memory before decoding, could do some sort of
   streaming support here if I could figure out the jni bits for that.
 - image-rs actually supports a wide range of image formats but only APNGs are currently supported.
