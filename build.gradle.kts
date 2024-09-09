@@ -8,7 +8,7 @@ plugins {
 }
 
 group = "me.tatarka.android"
-version = "0.4"
+version = "0.5-SNAPSHOT"
 
 nexusPublishing {
     repositories {
